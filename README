@@ -1,0 +1,29 @@
+
+# tinyblob library
+
+### At the time of turnin:
+
+Not implemented (due to limited time):
+    - mutex
+    - threaded driver, that does sync and async IOs
+    - recovery for blob_metadata in the block version of the library
+
+
+You can compile the library with my test using:
+```bash
+#for the tinyblob with file support
+make file_test
+
+#for the tinyblob with block support
+make block_test
+
+mkdir <data_directory>
+
+./test <data_directory>
+
+
+
+# for cleanup
+make clean
+
+```

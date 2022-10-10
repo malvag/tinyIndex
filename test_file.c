@@ -5,24 +5,25 @@
 
 
 int main(int argc, char **argv) {
-  // tb_init(argv[1]);
-  // for (int i = 0; i < 1000; i++) {
-  //   tb_init(argv[1]);
-  //   bid_t new_blob_id = tb_allocate_blob();
+  printf("Starting... Creating 1000 blobs with flush & recoveries and after that we create another 1000 blobs without flushes and recoveries (avg time to complete 16-20 seconds) \n");
+  tb_init(argv[1]);
+  for (int i = 0; i < 1000; i++) {
+    tb_init(argv[1]);
+    bid_t new_blob_id = tb_allocate_blob();
 
-  //   assert(!tb_write_blob(new_blob_id, "DATA"));
+    assert(!tb_write_blob(new_blob_id, "DATA"));
 
-  //   char buf[FILE_BLOB_SIZE];
-  //   assert(!tb_read_blob(new_blob_id, buf));
+    char buf[FILE_BLOB_SIZE];
+    assert(!tb_read_blob(new_blob_id, buf));
 
-  //   buf[10] = '\0';
-  //   if (i % 1000 == 0)
-  //     printf("%d %s\n", new_blob_id, buf);
-  //   // tb_free_blob(new_blob_id);
-  //   tb_shutdown();
-  // }
+    buf[10] = '\0';
+    if (i % 1000 == 0)
+      printf("%d %s\n", new_blob_id, buf);
+    // tb_free_blob(new_blob_id);
+    tb_shutdown();
+  }
 
-  // printf("Finished with 1000 flush & recoveries \n");
+  printf("Finished with 1000 flush & recoveries \n");
 
   tb_init(argv[1]);
   char input[4096];
