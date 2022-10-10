@@ -1,5 +1,7 @@
-CCFLAGS = -g -D_GNU_SOURCE -Werror -pedantic
+CCFLAGS = -g -D_GNU_SOURCE -I$(INCLUDE) -Werror -pedantic
 
+SRC= src/file_tinyblob.o
+INCLUDE=include/
 TEST= test.o
 CC=gcc
 .PHONY: clean
@@ -10,7 +12,7 @@ all: clean test
 %.o: %.c
 	$(CC) $(CCFLAGS) -c $^ -o $@
 
-test: $(TEST) file_tinyblob.o
+test: $(TEST) $(SRC)
 	gcc $(CCFLAGS) $^ -o $@
 
 clean:

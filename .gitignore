@@ -2,3 +2,5 @@ store_data/
 .vscode
 *.o
 test
+
+src/aio*
