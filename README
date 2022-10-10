@@ -6,7 +6,8 @@
 Not implemented (due to limited time):
     - mutex
     - threaded driver, that does sync and async IOs
-    - recovery for blob_metadata in the block version of the library
+    - recovery for blob_metadata in the block version of the library after shutdown
+    - aio support
 
 
 You can compile the library with my test using:
