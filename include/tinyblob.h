@@ -4,25 +4,61 @@
 #include <stdio.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <pthread.h>
+
+#ifdef BLOCK_TINYBLOB
+#include <bitset>
+#endif
+
 #define DEVICE_BLOCK_SIZE 4096
 #define FS_LOGICAL_BLK_SIZE 512
-#define FILE_BLOB_SIZE DEVICE_BLOCK_SIZE
+#define FREE 1
+#define ALLOCATED 0
 
+
+#define FILE_BLOB_SIZE DEVICE_BLOCK_SIZE
 
 typedef uint64_t bid_t;
 static struct handle *tb_handle;
 
 struct blob{
     bid_t id;
+#ifdef BLOCK_TINYBLOB
+    uint64_t block_id;
+#endif
 } __attribute__((__packed__));
+
+
+#define MAX_BLOBS 2048
+#define DEVICE_BLOCK_FILE_SIZE (MAX_BLOBS * DEVICE_BLOCK_SIZE)
 
 struct handle{
     struct blob** table;
     char* location;
     bid_t bidno;
     bid_t table_size;
+
+    pthread_mutex_t* lock;
+    
+#ifdef BLOCK_TINYBLOB
+    int file_descriptor;
+#endif
 }  __attribute__((__packed__));
 
+
+/*
+           | ---- ----- superblock  ----- --- |-------- data -------------- -- - -
+  db.bin:  |  HANDLE  |  BITMAP  | BLOBS_META |  BLOB_VALUE0 - BLOB_VALUE1 - - -
+
+*/
+
+#define BITMAP_FILE_SIZE MAX_BLOBS * sizeof(uint8_t)
+#define BLOBS_META_FILE_SIZE 4096
+#define BITMAP_OFFSET 4096 // in reality sizeof(handle)
+#define HANDLE_OFFSET 0
+#define BLOBS_META_OFFSET (BITMAP_OFFSET + BITMAP_FILE_SIZE)
+#define DATA_OFFSET (BLOBS_META_OFFSET + BLOBS_META_FILE_SIZE)
+// 
 typedef struct handle handle;
 typedef struct blob blob;
 
