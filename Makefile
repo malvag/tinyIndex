@@ -33,4 +33,5 @@ block_test: $(TEST_BLOCK) $(BLOCK_TINYBLOB)
 	$(CXX) $(CXXFLAGS)  $^ -o test
 
 clean:
-	rm -rf src/*.o *.o test
+	rm -rf src/*.o *.o store_data test
+	mkdir store_data

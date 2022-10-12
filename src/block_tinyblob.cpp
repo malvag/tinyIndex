@@ -14,8 +14,9 @@
 #define INITIAL_BLOBS_NUMBER 10
 
 /*
-           | ---- ----- superblock  ----- --- |-------- data -------------- -- - -
-  db.bin:  |  HANDLE  |  BITMAP  | BLOBS_META | BLOB_VALUE0 | BLOB_VALUE0 - BLOB_VALUE1 - - -
+           | ---- ----- superblock  ----- --- |-------- data -------------- -- -
+  - db.bin:  |  HANDLE  |  BITMAP  | BLOBS_META | BLOB_VALUE0 | BLOB_VALUE0 -
+  BLOB_VALUE1 - - -
 
 */
 
@@ -137,8 +138,8 @@ bid_t tb_allocate_blob(void) {
   posix_memalign((void **)&new_blob, FS_LOGICAL_BLK_SIZE, sizeof(blob));
 
   new_blob->id = generate_blob_id();
-  printf("new id %d\n", new_blob->id);
-  // exit(1);
+  // printf("new id %d\n", new_blob->id);
+  //  exit(1);
   if (tb_handle->bidno - 1 == tb_handle->table_size) {
     tb_handle->table_size *= 2;
     tb_handle->table = (blob **)realloc(tb_handle->table,
@@ -196,6 +197,7 @@ int tb_read_blob(bid_t blob_id, void *data) {
     return -1;
   }
   blob *b = tb_handle->table[blob_id];
+  printf("id:%d block:%lu\n", b->id, b->block_id);
 
   // align the data given from the user
   char *buffer_aligned = NULL;
@@ -203,12 +205,13 @@ int tb_read_blob(bid_t blob_id, void *data) {
 
   int ret = pread(tb_handle->file_descriptor, buffer_aligned, FILE_BLOB_SIZE,
                   DATA_OFFSET + b->block_id * FILE_BLOB_SIZE);
-  memcpy(data, buffer_aligned, FILE_BLOB_SIZE);
 
   if (ret < 0) {
     printf("%s: Could not read blob with bid %lu\n", __func__, b->id);
     return -1;
   }
+
+  memcpy(data, buffer_aligned, FILE_BLOB_SIZE);
   return 0;
 }
 
@@ -227,14 +230,6 @@ void tb_free_blob(bid_t blob_id) {
   tb_handle->table[blob_id] = NULL; // TODO: what about fragmentation(?)
 }
 
-// Flush all data and metadata to the disk.
-void tb_flush(void) {
-  // create blobs_file: contains blob's metadata
-  sync_flush_bitmap_buffer();
-  // create handle_file: contains handle's struct
-  sync_flush_handle_buffer();
-}
-
 // Clean shutdown of the store; Flush all data and metadata so that it is
 // possible to start from the same files/device.
 void tb_shutdown(void) {
@@ -242,6 +237,7 @@ void tb_shutdown(void) {
   tb_flush();
   // free everything
   close(tb_handle->file_descriptor);
+  free(tb_handle->lock);
   free(tb_handle->location);
   for (uint32_t i = 0; i < tb_handle->bidno; ++i) {
     free(tb_handle->table[i]);
@@ -324,6 +320,16 @@ size_t round_up_to_blksize(size_t buffer_size) {
   return buffer_size;
 }
 
+// Flush all data and metadata to the disk.
+void tb_flush(void) {
+  // create blobs_file
+  sync_flush_bitmap_buffer();
+  // flush handle buffer
+  sync_flush_handle_buffer();
+  // flush blobs metadata
+  sync_flush_blobs_buffer();
+}
+
 void sync_recover_handle(int fd) {
   size_t handle_file_size = round_up_to_blksize(sizeof(handle));
 
@@ -331,15 +337,13 @@ void sync_recover_handle(int fd) {
   posix_memalign((void **)&aligned_handle_buffer, FS_LOGICAL_BLK_SIZE,
                  handle_file_size);
 
-  int ret = pread(fd, aligned_handle_buffer,
-                  handle_file_size, HANDLE_OFFSET);
+  int ret = pread(fd, aligned_handle_buffer, handle_file_size, HANDLE_OFFSET);
   if (ret < 0) {
     printf("%s: %s: Could not read file \n", strerror(errno), __func__);
     exit(-1);
   }
   tb_handle = (handle *)aligned_handle_buffer;
 }
-
 
 void sync_recover_blobs() {
   size_t blob_file_size = BLOBS_META_FILE_SIZE;
@@ -355,14 +359,16 @@ void sync_recover_blobs() {
     exit(-1);
   }
 
+  int recovered_blob_count = 0;
   for (size_t i = 0; i < tb_handle->bidno; i++) {
-    blob *new_blob = NULL;
-    posix_memalign((void **)&new_blob, FS_LOGICAL_BLK_SIZE, sizeof(blob));
+    blob *new_blob = (blob *)memalign(FS_LOGICAL_BLK_SIZE, sizeof(blob));
     memcpy(new_blob, &aligned_blob_buffer[i * sizeof(blob)], sizeof(blob));
     tb_handle->table[i] = new_blob;
-    printf("INFO: recovered BLOB %d\n",new_blob->id);
+    recovered_blob_count++;
   }
 
+  printf("INFO: recovered blobs: %d/%d\n", recovered_blob_count,
+         tb_handle->bidno);
   free(aligned_blob_buffer);
 }
 
