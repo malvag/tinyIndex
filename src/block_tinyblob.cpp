@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <malloc.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -19,6 +20,7 @@
   BLOB_VALUE1 - - -
 
 */
+static struct handle *tb_handle;
 
 std::bitset<MAX_BLOBS> bitmap;
 
@@ -28,6 +30,28 @@ void sync_flush_bitmap_buffer();
 void tb_recover(char *location);
 void init_block_device(char *filepath);
 size_t round_up_to_blksize(size_t);
+
+int init_rwlock() {
+  pthread_rwlock_t *rwlock =
+      (pthread_rwlock_t *)malloc(sizeof(pthread_rwlock_t));
+  pthread_rwlockattr_t *rwlock_attr =
+      (pthread_rwlockattr_t *)malloc(sizeof(pthread_rwlock_t));
+  pthread_rwlockattr_init(rwlock_attr);
+  pthread_rwlockattr_setpshared(rwlock_attr, PTHREAD_PROCESS_SHARED);
+  if (pthread_rwlock_init(rwlock, rwlock_attr) == 0) {
+    tb_handle->lock = rwlock;
+    tb_handle->lock_attr = rwlock_attr;
+    return 0;
+  }
+  return -1;
+}
+
+void destroy_rwlock() {
+  pthread_rwlockattr_destroy(tb_handle->lock_attr);
+  free(tb_handle->lock_attr);
+  pthread_rwlock_destroy(tb_handle->lock);
+  free(tb_handle->lock);
+}
 
 int find_next_free_block() {
   if (bitmap.count() == 0)
@@ -119,14 +143,8 @@ void init_block_device(char *filepath) {
     bitmap.set(i, true);
 
   // init lock
-  tb_handle->lock = (pthread_mutex_t *)malloc(sizeof(*(tb_handle->lock)));
-  if (tb_handle->lock == NULL) {
-    exit(EXIT_FAILURE); // TODO: must handle error properly
-  }
-  if (pthread_mutex_init(tb_handle->lock, NULL) != 0) {
-    printf("\n ERROR: mutex init has failed\n");
-    close(fd);
-    return;
+  if (init_rwlock() < 0) {
+    printf("ERROR: could not initialize rwlock");
   }
 }
 
@@ -136,24 +154,17 @@ void init_block_device(char *filepath) {
 bid_t tb_allocate_blob(void) {
   blob *new_blob = NULL;
   posix_memalign((void **)&new_blob, FS_LOGICAL_BLK_SIZE, sizeof(blob));
-
+  RWLOCK_WRLOCK(tb_handle->lock);
   new_blob->id = generate_blob_id();
-  // printf("new id %d\n", new_blob->id);
-  //  exit(1);
-  if (tb_handle->bidno - 1 == tb_handle->table_size) {
-    tb_handle->table_size *= 2;
-    tb_handle->table = (blob **)realloc(tb_handle->table,
-                                        tb_handle->table_size * sizeof(blob *));
-  }
-
-  new_blob->block_id = find_next_free_block();
+  if (new_blob->id == -1)
+    new_blob->block_id = find_next_free_block();
   if (new_blob->block_id == -1) {
     printf("ERROR: could not find free block\n");
     return -1;
   }
   // printf("INFO: Next available block %d\n", new_blob->block_id);
   tb_handle->table[new_blob->id] = new_blob;
-
+  RWLOCK_UNLOCK(tb_handle->lock);
   return new_blob->id;
 }
 
@@ -168,6 +179,7 @@ int tb_write_blob(bid_t blob_id, void *data) {
     printf("Cannot write null data into a blob(?), is this valid?\n");
     return -1;
   }
+  RWLOCK_WRLOCK(tb_handle->lock);
   blob *b = tb_handle->table[blob_id];
 
   // align the data given from the user
@@ -177,6 +189,7 @@ int tb_write_blob(bid_t blob_id, void *data) {
 
   int ret = pwrite(tb_handle->file_descriptor, data_aligned, FILE_BLOB_SIZE,
                    DATA_OFFSET + b->block_id * FILE_BLOB_SIZE);
+  RWLOCK_UNLOCK(tb_handle->lock);
   if (ret < 0) {
     printf("%s: %s: Could not write blob with bid %lu\n", strerror(errno),
            __func__, b->id);
@@ -197,12 +210,13 @@ int tb_read_blob(bid_t blob_id, void *data) {
     return -1;
   }
   blob *b = tb_handle->table[blob_id];
-  printf("id:%d block:%lu\n", b->id, b->block_id);
+  // printf("id:%d block:%lu\n", b->id, b->block_id);
 
   // align the data given from the user
   char *buffer_aligned = NULL;
-  posix_memalign((void **)&buffer_aligned, FS_LOGICAL_BLK_SIZE, FILE_BLOB_SIZE);
 
+  RWLOCK_RDLOCK(tb_handle->lock);
+  posix_memalign((void **)&buffer_aligned, FS_LOGICAL_BLK_SIZE, FILE_BLOB_SIZE);
   int ret = pread(tb_handle->file_descriptor, buffer_aligned, FILE_BLOB_SIZE,
                   DATA_OFFSET + b->block_id * FILE_BLOB_SIZE);
 
@@ -212,12 +226,14 @@ int tb_read_blob(bid_t blob_id, void *data) {
   }
 
   memcpy(data, buffer_aligned, FILE_BLOB_SIZE);
+  RWLOCK_UNLOCK(tb_handle->lock);
   return 0;
 }
 
 // Given a valid index from a successful allocate_blob call, it frees the
 // blob.
 void tb_free_blob(bid_t blob_id) {
+  RWLOCK_WRLOCK(tb_handle->lock);
   if (blob_id >= tb_handle->bidno) {
     printf("Incorrect blob_id, is this valid?\n");
     return;
@@ -227,18 +243,21 @@ void tb_free_blob(bid_t blob_id) {
   bitmap.set(b->block_id, true); // free the space
 
   free(b);
-  tb_handle->table[blob_id] = NULL; // TODO: what about fragmentation(?)
+  tb_handle->table[blob_id] = NULL; // TODO: what about
+  RWLOCK_UNLOCK(tb_handle->lock);
 }
 
 // Clean shutdown of the store; Flush all data and metadata so that it is
 // possible to start from the same files/device.
 void tb_shutdown(void) {
+  RWLOCK_WRLOCK(tb_handle->lock);
   // all data and metadata should be flushed to disk
   tb_flush();
   // free everything
   close(tb_handle->file_descriptor);
-  free(tb_handle->lock);
-  free(tb_handle->location);
+  RWLOCK_UNLOCK(tb_handle->lock);
+  destroy_rwlock();
+
   for (uint32_t i = 0; i < tb_handle->bidno; ++i) {
     free(tb_handle->table[i]);
   }
@@ -418,13 +437,7 @@ void tb_recover(char *location) {
   sync_recover_blobs();
 
   // init lock
-  tb_handle->lock = (pthread_mutex_t *)malloc(sizeof(*(tb_handle->lock)));
-  if (tb_handle->lock == NULL) {
-    exit(EXIT_FAILURE); // TODO: must handle error properly
-  }
-  if (pthread_mutex_init(tb_handle->lock, NULL) != 0) {
-    printf("\n ERROR: mutex init has failed\n");
-    close(fd);
-    return;
+  if (init_rwlock() < 0) {
+    printf("ERROR: could not initialize rwlock");
   }
 }

@@ -10,8 +10,7 @@
 #include <bitset>
 #endif
 
-typedef uint64_t bid_t;
-static struct handle *tb_handle;
+typedef uint64_t __attribute__((__may_alias__)) bid_t;
 
 struct blob {
   bid_t id;
@@ -26,19 +25,17 @@ struct handle {
   bid_t bidno;
   bid_t table_size;
 
-  pthread_mutex_t *lock;
-
+  pthread_rwlock_t *lock;
+  pthread_rwlockattr_t *lock_attr;
 #ifdef BLOCK_TINYBLOB
   int file_descriptor;
 #endif
 } __attribute__((__packed__));
 
-/*
-           | ---- ----- superblock  ----- --- |-------- data -------------- -- -
-  - db.bin:  |  HANDLE  |  BITMAP  | BLOBS_META |  BLOB_VALUE0 - BLOB_VALUE1 - -
-  -
-
-*/
+#define RWLOCK_INIT(L, attr) pthread_rwlock_init(L, attr)
+#define RWLOCK_WRLOCK(L) pthread_rwlock_wrlock(L)
+#define RWLOCK_RDLOCK(L) pthread_rwlock_rdlock(L)
+#define RWLOCK_UNLOCK(L) pthread_rwlock_unlock(L)
 
 #define DEVICE_BLOCK_SIZE 4096
 #define FS_LOGICAL_BLK_SIZE 512
@@ -46,8 +43,15 @@ struct handle {
 #define FREE 1
 #define ALLOCATED 0
 #define FILE_BLOB_SIZE DEVICE_BLOCK_SIZE
-#define MAX_BLOBS 2048
+#define MAX_BLOBS 1024LU * 1024L
 
+/*
+             | ---- ----- superblock  ----- --- |-------- data -------------- --
+  -
+  - db.bin:  |  HANDLE  |  BITMAP  | BLOBS_META |  BLOB_VALUE0 - BLOB_VALUE1 - -
+  -
+
+*/
 #define HANDLE_OFFSET 0
 #define HANDLE_FILE_SIZE 4096
 

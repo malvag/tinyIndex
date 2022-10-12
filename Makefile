@@ -1,5 +1,5 @@
 CCFLAGS = -g -D_GNU_SOURCE -I$(INCLUDE) -Werror -pedantic
-CXXFLAGS = -g -D_GNU_SOURCE -I$(INCLUDE)
+CXXFLAGS = -g  -D_GNU_SOURCE -I$(INCLUDE)
 
 FILE_TINYBLOB= src/file_tinyblob.o
 BLOCK_TINYBLOB= src/block_tinyblob.o

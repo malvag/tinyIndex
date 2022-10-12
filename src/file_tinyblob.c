@@ -9,7 +9,7 @@
 
 #include "tinyblob.h"
 
-#define INITIAL_BLOBS_NUMBER 10
+static struct handle *tb_handle;
 
 bid_t generate_blob_id(void) { return tb_handle->bidno++; }
 void sync_flush_handle_buffer();

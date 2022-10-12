@@ -26,21 +26,19 @@ int main(int argc, char **argv) {
 #if 1
   tb_init(argv[1]);
   char input[4096];
-  for (int i = 0; i < 24; i++) {
+  for (int i = 0; i < 50 * 1024; i++) {
     input[0] = 'D';
     input[1] = 'A';
     input[2] = 'T';
     input[3] = 'A';
-    input[4] = i;
+    input[4] = '\0';
     bid_t new_blob_id = tb_allocate_blob();
     assert(new_blob_id >= 0);
-    tb_write_blob(new_blob_id, input);
-    char buf[FILE_BLOB_SIZE];
-    tb_read_blob(new_blob_id, buf);
-
-    buf[5] = '\0';
-    if (i % 100 == 0)
-      printf("%d %s\n", new_blob_id, buf);
+    if (tb_write_blob(new_blob_id, input) < 0) {
+      exit(1);
+    }
+    if (new_blob_id % 1000 == 0)
+      printf("%d\n", new_blob_id);
   }
 
   tb_shutdown();
@@ -48,10 +46,13 @@ int main(int argc, char **argv) {
   tb_init(argv[1]);
 
   char buf[FILE_BLOB_SIZE];
-  tb_read_blob(15, buf);
+  for (int i = 0; i < 50000; i++) {
+    char buf[FILE_BLOB_SIZE];
+    tb_read_blob(i, buf);
 
-  buf[5] = '\0';
-  printf("%d %s\n", 15, buf);
-
+    if (i % 1000 == 0)
+      printf("%d %s\n", i, buf);
+  }
+  tb_shutdown();
   return 0;
 }
