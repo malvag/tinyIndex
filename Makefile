@@ -1,35 +1,23 @@
-CCFLAGS = -g -D_GNU_SOURCE -I$(INCLUDE) -Werror -pedantic
-CXXFLAGS = -g  -D_GNU_SOURCE -I$(INCLUDE)
+CXXFLAGS = -g  -D_GNU_SOURCE -I$(INCLUDE) #-fsanitize=address
 
-FILE_TINYBLOB= src/file_tinyblob.o
-BLOCK_TINYBLOB= src/block_tinyblob.o
 
 INCLUDE=include/
 TEST= test.o
-CC=gcc
 CXX=g++
-TEST_FILE=test_file.o
 TEST_BLOCK=test_block.o
 
-all: clean block_test
-.PHONY: clean
+LIBRARY= src/allocator.o src/index.o
 
-src/file_tinyblob.o: src/file_tinyblob.c
-	$(CC) $(CCFLAGS) -c $^ -o $@
+all: clean test
+.PHONY: clean library
 
-src/block_tinyblob.o: src/block_tinyblob.cpp
+src/%.o: src/%.cpp
 	$(CXX) $(CXXFLAGS) -c $^ -o $@
 
-$(TEST_BLOCK): test_block.c
-	$(CXX) -c $^ $@
+%.o: %.c
+	$(CXX) $(CXXFLAGS) -c $^ -o $@
 
-$(TEST_FILE): test_file.c
-	$(CC) -c $^ -o $@
-
-file_test: $(TEST_FILE) $(FILE_TINYBLOB)
-	$(CC) $(CCFLAGS) $^ -o test
-
-block_test: $(TEST_BLOCK) $(BLOCK_TINYBLOB)
+test: $(TEST_BLOCK) $(LIBRARY)
 	$(CXX) $(CXXFLAGS)  $^ -o test
 
 clean:

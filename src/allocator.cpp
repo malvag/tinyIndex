@@ -10,17 +10,15 @@
 
 #define BLOCK_TINYBLOB
 
-#include "../include/tinyblob.h"
-
-#define INITIAL_BLOBS_NUMBER 10
+#include "../include/allocator.h"
 
 /*
            | ---- ----- superblock  ----- --- |-------- data -------------- -- -
-  - db.bin:  |  HANDLE  |  BITMAP  | BLOBS_META | BLOB_VALUE0 | BLOB_VALUE0 -
-  BLOB_VALUE1 - - -
+  - db.bin:  |  tiny_blob_handle_t  |  BITMAP  | BLOBS_META | BLOB_VALUE0 |
+  BLOB_VALUE0 - BLOB_VALUE1 - - -
 
 */
-static struct handle *tb_handle;
+struct tiny_blob_handle_t *tb_handle = NULL;
 
 std::bitset<MAX_BLOBS> bitmap;
 
@@ -69,7 +67,7 @@ int find_next_free_block() {
 // return path of the blob file
 char *get_blob_filepath(bid_t blob_id) {
   assert(tb_handle->location != NULL);
-  char filepath[4096];
+  char filepath[4096] = {0};
   if (sprintf(filepath, "%s/B%lu", tb_handle->location, blob_id) < 0) {
     ("%s: Could not create path %s for blob with id %lu\n", __func__, filepath,
      blob_id);
@@ -105,7 +103,8 @@ void tb_init(char *location) {
     /*printf("Found store with %d %d \n", tb_handle->bidno,
            tb_handle->table_size);*/
   } else {
-    posix_memalign((void **)&tb_handle, FS_LOGICAL_BLK_SIZE, sizeof(handle));
+    posix_memalign((void **)&tb_handle, FS_LOGICAL_BLK_SIZE,
+                   sizeof(tiny_blob_handle_t));
     tb_handle->table_size = MAX_BLOBS;
     tb_handle->bidno = 0;
     tb_handle->table = (blob **)calloc(tb_handle->table_size, sizeof(blob *));
@@ -119,7 +118,7 @@ void tb_init(char *location) {
 void init_block_device(char *filepath) {
   assert(tb_handle != NULL);
   assert(tb_handle->location != NULL);
-  // open handle
+  // open tiny_blob_handle_t
   int fd = open(filepath, O_CREAT | O_RDWR | O_DSYNC | O_DIRECT, 0600);
   if (fd < 0) {
     printf("%s: Could not open block_device file (path: %s)\n", strerror(errno),
@@ -129,7 +128,7 @@ void init_block_device(char *filepath) {
   printf("INFO: Created file %s\n", filepath);
 
   // fallocate
-  int ret = posix_fallocate(fd, 0, DEVICE_BLOCK_FILE_SIZE);
+  int ret = posix_fallocate(fd, 0, DB_FILE_SIZE);
   if (ret < 0) {
     printf("%s: Could not fallocate block_file (path: %s)\n", strerror(errno),
            filepath);
@@ -148,10 +147,10 @@ void init_block_device(char *filepath) {
   }
 }
 
-// On success it returns the index/id of the allocated blob in the store. On
-// failure it returns -1; When using files you can use a naming scheme “Bxxx”
+// On success it returns the tiny_index/id of the allocated blob in the store.
+// On failure it returns -1; When using files you can use a naming scheme “Bxxx”
 // to name each blob file.
-bid_t tb_allocate_blob(void) {
+bid_t tb_allocate_blob(enum owner owner) {
   blob *new_blob = NULL;
   posix_memalign((void **)&new_blob, FS_LOGICAL_BLK_SIZE, sizeof(blob));
   RWLOCK_WRLOCK(tb_handle->lock);
@@ -162,6 +161,8 @@ bid_t tb_allocate_blob(void) {
     printf("ERROR: could not find free block\n");
     return -1;
   }
+  new_blob->owner= owner;
+  new_blob->size_used = FILE_BLOB_SIZE;
   // printf("INFO: Next available block %d\n", new_blob->block_id);
   tb_handle->table[new_blob->id] = new_blob;
   RWLOCK_UNLOCK(tb_handle->lock);
@@ -172,7 +173,7 @@ bid_t tb_allocate_blob(void) {
 // data buffer. Return success or failure.
 int tb_write_blob(bid_t blob_id, void *data) {
   if (blob_id >= tb_handle->bidno) {
-    printf("Incorrect blob_id, is this valid?\n");
+    printf("Incorrect blob_id %d, is this valid?\n",blob_id);
     return -1;
   }
   if (!data) {
@@ -189,6 +190,7 @@ int tb_write_blob(bid_t blob_id, void *data) {
 
   int ret = pwrite(tb_handle->file_descriptor, data_aligned, FILE_BLOB_SIZE,
                    DATA_OFFSET + b->block_id * FILE_BLOB_SIZE);
+  // free(data_aligned);
   RWLOCK_UNLOCK(tb_handle->lock);
   if (ret < 0) {
     printf("%s: %s: Could not write blob with bid %lu\n", strerror(errno),
@@ -202,7 +204,7 @@ int tb_write_blob(bid_t blob_id, void *data) {
 // buffer. Return success or failure.
 int tb_read_blob(bid_t blob_id, void *data) {
   if (blob_id >= tb_handle->bidno) {
-    printf("Incorrect blob_id, is this valid?\n");
+    printf("Incorrect blob_id %d, is this valid?\n",blob_id);
     return -1;
   }
   if (!data) {
@@ -230,7 +232,7 @@ int tb_read_blob(bid_t blob_id, void *data) {
   return 0;
 }
 
-// Given a valid index from a successful allocate_blob call, it frees the
+// Given a valid tiny_index from a successful allocate_blob call, it frees the
 // blob.
 void tb_free_blob(bid_t blob_id) {
   RWLOCK_WRLOCK(tb_handle->lock);
@@ -310,7 +312,7 @@ void sync_flush_blobs_buffer() {
 }
 
 void sync_flush_handle_buffer() {
-  size_t handle_file_size = round_up_to_blksize(sizeof(handle));
+  size_t handle_file_size = round_up_to_blksize(sizeof(tiny_blob_handle_t));
 
   char *aligned_handle_buffer = NULL;
   posix_memalign((void **)&aligned_handle_buffer, FS_LOGICAL_BLK_SIZE,
@@ -322,8 +324,8 @@ void sync_flush_handle_buffer() {
                    handle_file_size, HANDLE_OFFSET);
 
   if (ret < 0) {
-    printf("%s: %s: Could not write handle buffer \n", strerror(errno),
-           __func__);
+    printf("%s: %s: Could not write tiny_blob_handle_t buffer \n",
+           strerror(errno), __func__);
   }
   free(aligned_handle_buffer);
 }
@@ -343,14 +345,14 @@ size_t round_up_to_blksize(size_t buffer_size) {
 void tb_flush(void) {
   // create blobs_file
   sync_flush_bitmap_buffer();
-  // flush handle buffer
+  // flush tiny_blob_handle_t buffer
   sync_flush_handle_buffer();
   // flush blobs metadata
   sync_flush_blobs_buffer();
 }
 
 void sync_recover_handle(int fd) {
-  size_t handle_file_size = round_up_to_blksize(sizeof(handle));
+  size_t handle_file_size = round_up_to_blksize(sizeof(tiny_blob_handle_t));
 
   char *aligned_handle_buffer = NULL;
   posix_memalign((void **)&aligned_handle_buffer, FS_LOGICAL_BLK_SIZE,
@@ -361,7 +363,7 @@ void sync_recover_handle(int fd) {
     printf("%s: %s: Could not read file \n", strerror(errno), __func__);
     exit(-1);
   }
-  tb_handle = (handle *)aligned_handle_buffer;
+  tb_handle = (tiny_blob_handle_t *)aligned_handle_buffer;
 }
 
 void sync_recover_blobs() {
@@ -418,7 +420,7 @@ void tb_recover(char *location) {
     return;
   }
 
-  // open handle
+  // open tiny_blob_handle_t
   int fd = open(location, O_RDWR | O_DSYNC | O_DIRECT, 0600);
   if (fd < 0) {
     printf("%s: Could not open block_device file (path: %s)\n", strerror(errno),
@@ -440,4 +442,17 @@ void tb_recover(char *location) {
   if (init_rwlock() < 0) {
     printf("ERROR: could not initialize rwlock");
   }
+}
+bid_t find_next_available_blob(uint32_t size_needed) {
+  RWLOCK_RDLOCK(tb_handle->lock);
+  for (int i = 0; i < tb_handle->bidno; i++) {
+    blob* b = tb_handle->table[i];
+    if (b->owner == USER && b->size_used > size_needed) {
+      RWLOCK_UNLOCK(tb_handle->lock);
+      return i;
+    }
+  }
+  RWLOCK_UNLOCK(tb_handle->lock);
+  bid_t bid = tb_allocate_blob(USER);
+  return bid;
 }

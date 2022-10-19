@@ -1,0 +1,59 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html><head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta http-equiv="Content-Style-Type" content="text/css">
+  <title>CS647: Modern Storage Systems</title>
+  <meta name="Generator" content="Cocoa HTML Writer">
+  <meta name="CocoaVersion" content="2113.6">
+  <style type="text/css">
+    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 14.0px Calibri; color: #000000; -webkit-text-stroke: #000000}
+    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 14.0px Calibri; color: #000000; -webkit-text-stroke: #000000; min-height: 17.0px}
+    p.p3 {margin: 0.0px 0.0px 0.0px 0.0px; text-align: justify; font: 14.0px Calibri; color: #000000; -webkit-text-stroke: #000000}
+    span.s1 {font-kerning: none}
+  </style>
+</head>
+<body>
+<p class="p1"><span class="s1"><b>CS647 Assignment 2:</b> Add a simple hash-based logical-to-physical translation layer with tinyindex</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">The goal of this assignment is to write a
+ simple library that provides a dictionary API put(), get(), erase(), 
+scan() by utilizing the tinyblob library.</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">The assignment:</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">1. The library</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">Implement a tinyindex library that 
+provides a dictionary API (put, get, erase, scan). Assume a maximum 
+configurable (compile-time) size for keys and values. Store all (k,v) 
+pairs using your tinyBlob library. Ensure your program closes properly 
+the store at shutdown and starts from an existing store. For tinyindex 
+you can use an API, such as:</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">int put(char * key,char * value); //Return 0 on success -1 on failure.</span></p>
+<p class="p1"><span class="s1">char * get(char * key); //Return a buffer filled with the value if key is found, null if key is not found.</span></p>
+<p class="p1"><span class="s1">int erase(char *key); // Return 0 on success -1 on failure.</span></p>
+<p class="p1"><span class="s1">scanner_handle_t scan_init(void); // Initialize a scanner return 0 on success -1 on failure.</span></p>
+<p class="p1"><span class="s1">char * get_scan_key(scanner_handle_t scanner); // Get a pointer to the current key for this scanner.</span></p>
+<p class="p1"><span class="s1">char * get_scan_value(scanner_handle_t scanner); // Get a pointer to the current value for this scanner.</span></p>
+<p class="p1"><span class="s1">int close_scanner(scanner_handle_t scanner); // Release the resources for the scanner.</span></p>
+<p class="p1"><span class="s1">void persist(char * location); // Store all the key values on the location path.</span></p>
+<p class="p1"><span class="s1">void recover(char * location); // Restore all the key values stored on the location path.</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">2. Driver program</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">Implement a driver program that will 
+create a tinyindex store, and use YCSB to benchmark your implementation.
+ Threads can use synchronous or asynchronous I/O. The driver program 
+will report latency for different patterns, IO sizes, number of threads,
+ number of asynchronous IOs.<br>
+</span></p>
+<p class="p3"><span class="s1"><b>Submission</b><span class="Apple-converted-space">&nbsp;</span></span></p>
+<p class="p3"><span class="s1">Turn in (by mail to h y 6 4 7 @ c s d . u
+ o c . g r) a tar file that contains your solutions and a README file 
+stating assumptions or special features.</span></p>
+<p class="p1"><span class="s1"><b>___________________________________________________________________________________________________________________________________</b><br>
+(c) Copyright University of Crete, Greece, Last Modified: 10-Oct-2022</span></p>
+
+
+</body></html>

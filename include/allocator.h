@@ -6,20 +6,21 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#ifdef BLOCK_TINYBLOB
 #include <bitset>
-#endif
+
+#include "config.h"
 
 typedef uint64_t __attribute__((__may_alias__)) bid_t;
+enum owner { USER, HANDLE};
 
 struct blob {
   bid_t id;
-#ifdef BLOCK_TINYBLOB
   uint64_t block_id;
-#endif
+  uint32_t size_used;
+  enum owner owner;
 } __attribute__((__packed__));
 
-struct handle {
+struct tiny_blob_handle_t {
   struct blob **table;
   char *location;
   bid_t bidno;
@@ -27,48 +28,16 @@ struct handle {
 
   pthread_rwlock_t *lock;
   pthread_rwlockattr_t *lock_attr;
-#ifdef BLOCK_TINYBLOB
   int file_descriptor;
-#endif
 } __attribute__((__packed__));
+
+typedef struct tiny_blob_handle_t tiny_blob_handle_t;
+typedef struct blob blob;
 
 #define RWLOCK_INIT(L, attr) pthread_rwlock_init(L, attr)
 #define RWLOCK_WRLOCK(L) pthread_rwlock_wrlock(L)
 #define RWLOCK_RDLOCK(L) pthread_rwlock_rdlock(L)
 #define RWLOCK_UNLOCK(L) pthread_rwlock_unlock(L)
-
-#define DEVICE_BLOCK_SIZE 4096
-#define FS_LOGICAL_BLK_SIZE 512
-
-#define FREE 1
-#define ALLOCATED 0
-#define FILE_BLOB_SIZE DEVICE_BLOCK_SIZE
-#define MAX_BLOBS 1024LU * 1024L
-
-/*
-             | ---- ----- superblock  ----- --- |-------- data -------------- --
-  -
-  - db.bin:  |  HANDLE  |  BITMAP  | BLOBS_META |  BLOB_VALUE0 - BLOB_VALUE1 - -
-  -
-
-*/
-#define HANDLE_OFFSET 0
-#define HANDLE_FILE_SIZE 4096
-
-#define BITMAP_OFFSET HANDLE_FILE_SIZE // in reality sizeof(handle)
-#define BITMAP_FILE_SIZE MAX_BLOBS
-
-#define BLOBS_META_FILE_SIZE MAX_BLOBS * sizeof(blob)
-#define BLOBS_META_OFFSET (BITMAP_OFFSET + BITMAP_FILE_SIZE)
-
-#define DATA_OFFSET (BLOBS_META_OFFSET + BLOBS_META_FILE_SIZE)
-
-#define DEVICE_BLOCK_FILE_SIZE                                                 \
-  ((MAX_BLOBS * DEVICE_BLOCK_SIZE) + HANDLE_FILE_SIZE + BITMAP_FILE_SIZE +     \
-   BLOBS_META_FILE_SIZE)
-//
-typedef struct handle handle;
-typedef struct blob blob;
 
 void tb_flush(
     void); // Flush all data and metadata to the disk.  NOTE! Be careful when
@@ -86,12 +55,12 @@ void tb_shutdown(
            // it is possible to start from the same files/device.
 
 bid_t tb_allocate_blob(
-    void); // On success it returns the index/id of the allocated blob in the
-           // store. On failure it returns -1; When using files you can use a
-           // naming scheme “Bxxx” to name each blob file.
+    enum owner); // On success it returns the tiny_index/id of the allocated blob in
+           // the store. On failure it returns -1; When using files you can use
+           // a naming scheme “Bxxx” to name each blob file.
 
-void tb_free_blob(bid_t); // Given a valid index from a successful allocate_blob
-                          // call, it frees the blob.
+void tb_free_blob(bid_t); // Given a valid tiny_index from a successful
+                          // allocate_blob call, it frees the blob.
 
 int tb_write_blob(
     bid_t,
@@ -106,14 +75,16 @@ int tb_read_blob(
 char *get_blob_filepath(bid_t blob_id);
 // /*(extra credit)*/
 // iohandle_t tb_write_blob_issue(bid_t, void *data); // Issue an asynchronous a
-// write operation (of the full blob) from the data buffer to blob_index. Return
-// a handle to identify the I/O.
+// write operation (of the full blob) from the data buffer to tiny_index. Return
+// a tiny_blob_handle_t to identify the I/O.
 
 // /*(extra credit)*/
 // iohandle_t tb_read_blob_issue(bid_t, void *data) // Issue an asynchronous
-// read  (of the full blob)  to blob_index a in buffer data (data must be a
-// valid, preallocated buffer). Return a handle to identify the I/O.
+// read  (of the full blob)  to tiny_index a in buffer data (data must be a
+// valid, preallocated buffer). Return a tiny_blob_handle_t to identify the I/O.
 
 // /*(extra credit)*/
 // void tb_wait_io(iohandle_t); // Wait for the asynchronous id to be performed.
+
+bid_t find_next_available_blob(uint32_t size_needed);
 #endif
