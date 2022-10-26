@@ -1,4 +1,4 @@
-CXXFLAGS = -g  -D_GNU_SOURCE -I$(INCLUDE) #-fsanitize=address
+CXXFLAGS = -g -D_GNU_SOURCE -I$(INCLUDE)# -fsanitize=address
 
 
 INCLUDE=include/

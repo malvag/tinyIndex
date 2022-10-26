@@ -29,7 +29,7 @@
 #define HANDLE_OFFSET 0
 #define HANDLE_FILE_SIZE 4096
 
-#define BITMAP_OFFSET HANDLE_FILE_SIZE // in reality sizeof(tiny_blob_handle_t)
+#define BITMAP_OFFSET HANDLE_FILE_SIZE
 #define BITMAP_FILE_SIZE MAX_BLOBS
 
 #define BLOBS_META_FILE_SIZE MAX_BLOBS * sizeof(blob)

@@ -8,25 +8,25 @@
 
 #define LOOKUP_TABLE_BLOB_ID 0
 #define OFFSET_IN_BLOB(bid) FILE_BLOB_SIZE - tb_handle->table[bid]->size_used
+#define DEBUG 0
 
 struct tiny_kv_pair {
   uint32_t key_size;
-  const char *key;
-
   uint32_t value_size;
-  const char *value;
+  char *key;
+  char *value;
 } __attribute__((__packed__));
 
 struct lookup_index_node {
-  uint32_t tiny_kv_pair_size; // go-to-allocated-blobs-> read first 4bytes
   bid_t blob_id;
   uint64_t blob_offset;
+  uint32_t tiny_kv_pair_size; // go-to-allocated-blobs-> read first 4bytes
 } __attribute__((__packed__));
 
 struct lookup_index {
+  struct lookup_index_node map_data[MAX_LOOKUP_INDEX_NODE_COUNT];
   bid_t next_blob_id;
   uint32_t map_size;
-  struct lookup_index_node map_data[MAX_LOOKUP_INDEX_NODE_COUNT];
 } __attribute__((__packed__));
 
 // typedef struct blob blob_t;
@@ -37,7 +37,7 @@ private:
 
 public:
   tiny_blob_handle_t *handle_ = nullptr;
-  std::unordered_map<const char *, lookup_index_node> lookup_;
+  std::unordered_map<std::string, lookup_index_node> lookup_;
 
   // Return 0 on success -1 on failure.
   int put(char *key, char *value);

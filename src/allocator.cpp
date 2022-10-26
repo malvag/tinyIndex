@@ -12,12 +12,6 @@
 
 #include "../include/allocator.h"
 
-/*
-           | ---- ----- superblock  ----- --- |-------- data -------------- -- -
-  - db.bin:  |  tiny_blob_handle_t  |  BITMAP  | BLOBS_META | BLOB_VALUE0 |
-  BLOB_VALUE0 - BLOB_VALUE1 - - -
-
-*/
 struct tiny_blob_handle_t *tb_handle = NULL;
 
 std::bitset<MAX_BLOBS> bitmap;
@@ -155,13 +149,12 @@ bid_t tb_allocate_blob(enum owner owner) {
   posix_memalign((void **)&new_blob, FS_LOGICAL_BLK_SIZE, sizeof(blob));
   RWLOCK_WRLOCK(tb_handle->lock);
   new_blob->id = generate_blob_id();
-  if (new_blob->id == -1)
-    new_blob->block_id = find_next_free_block();
+  new_blob->block_id = find_next_free_block();
   if (new_blob->block_id == -1) {
     printf("ERROR: could not find free block\n");
-    return -1;
+    return 0;
   }
-  new_blob->owner= owner;
+  new_blob->owner = owner;
   new_blob->size_used = FILE_BLOB_SIZE;
   // printf("INFO: Next available block %d\n", new_blob->block_id);
   tb_handle->table[new_blob->id] = new_blob;
@@ -173,7 +166,7 @@ bid_t tb_allocate_blob(enum owner owner) {
 // data buffer. Return success or failure.
 int tb_write_blob(bid_t blob_id, void *data) {
   if (blob_id >= tb_handle->bidno) {
-    printf("Incorrect blob_id %d, is this valid?\n",blob_id);
+    printf("Incorrect blob_id %d, is this valid?\n", blob_id);
     return -1;
   }
   if (!data) {
@@ -204,7 +197,7 @@ int tb_write_blob(bid_t blob_id, void *data) {
 // buffer. Return success or failure.
 int tb_read_blob(bid_t blob_id, void *data) {
   if (blob_id >= tb_handle->bidno) {
-    printf("Incorrect blob_id %d, is this valid?\n",blob_id);
+    printf("Incorrect blob_id %d, is this valid?\n", blob_id);
     return -1;
   }
   if (!data) {
@@ -228,6 +221,7 @@ int tb_read_blob(bid_t blob_id, void *data) {
   }
 
   memcpy(data, buffer_aligned, FILE_BLOB_SIZE);
+  free(buffer_aligned);
   RWLOCK_UNLOCK(tb_handle->lock);
   return 0;
 }
@@ -446,7 +440,7 @@ void tb_recover(char *location) {
 bid_t find_next_available_blob(uint32_t size_needed) {
   RWLOCK_RDLOCK(tb_handle->lock);
   for (int i = 0; i < tb_handle->bidno; i++) {
-    blob* b = tb_handle->table[i];
+    blob *b = tb_handle->table[i];
     if (b->owner == USER && b->size_used > size_needed) {
       RWLOCK_UNLOCK(tb_handle->lock);
       return i;
