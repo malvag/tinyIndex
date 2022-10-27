@@ -1,22 +1,21 @@
 #pragma once
-#include "allocator.h"
+// #include "allocator.h"
+#define FIRST_DATA_BLOB 1
+#include "index.h"
+#include <map>
 
-class scanner_handle_t
-{
-    // scanner_handle_t(const blob* blob)
-    //     : blob_(blob) 
-    // {
-    // }
+class scanner_handle_t {
+public:
+  scanner_handle_t(
+      std::unordered_map<std::string, struct lookup_index_node> map);
+  int go_to_next();
 
-    //  has_next() {
-    // }
+  char *get_key();
+  char *get_value();
 
 private:
-    // blob* bolb_;
+  char *opened_blob_buffer_;
+  bid_t opened_blob_;
+  std::map<std::string, struct lookup_index_node> map_;
+  std::map<std::string, struct lookup_index_node>::iterator iterator_;
 };
-
-/*
-        
-        hashtable | ... | ... | ... | ... |
-
-*/

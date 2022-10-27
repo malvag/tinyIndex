@@ -156,6 +156,7 @@ bid_t tb_allocate_blob(enum owner owner) {
   }
   new_blob->owner = owner;
   new_blob->size_used = FILE_BLOB_SIZE;
+  printf("Allocated new blob %lu %d\n", new_blob->id,new_blob->owner);
   // printf("INFO: Next available block %d\n", new_blob->block_id);
   tb_handle->table[new_blob->id] = new_blob;
   RWLOCK_UNLOCK(tb_handle->lock);

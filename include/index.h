@@ -4,7 +4,6 @@
 #include <unordered_map>
 
 #include "allocator.h"
-#include "scanner.h"
 
 #define LOOKUP_TABLE_BLOB_ID 0
 #define OFFSET_IN_BLOB(bid) FILE_BLOB_SIZE - tb_handle->table[bid]->size_used
@@ -29,6 +28,7 @@ struct lookup_index {
   uint32_t map_size;
 } __attribute__((__packed__));
 
+class scanner_handle_t;
 // typedef struct blob blob_t;
 class tiny_index {
 private:
@@ -49,17 +49,22 @@ public:
   // Return 0 on success -1 on failure.
   int erase(char *key);
 
-  // Initialize a scanner return 0 on success -1 on failure.
-  scanner_handle_t scan_init(void);
+  // Initialize a scanner, return a pointer to a scanner handle on success NULL
+  // on failure.
+  scanner_handle_t *scan_init(void);
+
+  // Iterate to the next KV, return 0 if handle moved forward or -1 if it
+  // reached the end.
+  int get_next(scanner_handle_t *scanner);
 
   // Get a pointer to the current key for this scanner.
-  char *get_scan_key(scanner_handle_t scanner);
+  char *get_scan_key(scanner_handle_t *scanner);
 
   // Get a pointer to the current value for this scanner.
-  char *get_scan_value(scanner_handle_t scanner);
+  char *get_scan_value(scanner_handle_t *scanner);
 
   // Release the resources for the scanner.
-  int close_scanner(scanner_handle_t scanner);
+  int close_scanner(scanner_handle_t *scanner);
 
   // Store all the key values on the location path.
   void persist(char *location);
