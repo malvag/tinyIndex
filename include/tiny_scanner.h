@@ -1,7 +1,7 @@
 #pragma once
-// #include "allocator.h"
+
 #define FIRST_DATA_BLOB 1
-#include "index.h"
+#include "tiny_index.h"
 #include <map>
 
 class scanner_handle_t {
@@ -16,6 +16,6 @@ public:
 private:
   char *opened_blob_buffer_;
   bid_t opened_blob_;
-  std::map<std::string, struct lookup_index_node> map_;
+  std::map<std::string, struct lookup_index_node> *map_;
   std::map<std::string, struct lookup_index_node>::iterator iterator_;
 };

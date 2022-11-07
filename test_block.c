@@ -1,5 +1,4 @@
-#include "include/allocator.h"
-#include "include/index.h"
+#include "tiny_index.h"
 #include "string.h"
 #include <assert.h>
 #include <fmt/core.h>
@@ -13,7 +12,7 @@ int main(int argc, char **argv) {
   std::string value;
   tiny_index blob_idx;
   blob_idx.recover(argv[1]);
-  for (int i = 0; i < 10000; i++) {
+  for (int i = 0; i < 1000; i++) {
     key = "malvag" + std::to_string(i);
     value = "adata" + std::to_string(i);
     blob_idx.put((char *)key.c_str(), (char *)value.c_str());

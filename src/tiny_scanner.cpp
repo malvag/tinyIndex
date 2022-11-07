@@ -1,8 +1,9 @@
-#include "../include/scanner.h"
+#include "tiny_scanner.h"
 
+#include <cstdint>
 #include <string.h>
 int scanner_handle_t::go_to_next() {
-  if (iterator_ != map_.end()) {
+  if (iterator_ != map_->end()) {
     iterator_++;
     return 0;
   }
@@ -12,15 +13,15 @@ int scanner_handle_t::go_to_next() {
 scanner_handle_t::scanner_handle_t(
     std::unordered_map<std::string, struct lookup_index_node> map) {
 
-  std::map<std::string, struct lookup_index_node> ordered(map.begin(),
-                                                          map.end());
+  map_ = new std::map<std::string, struct lookup_index_node>(map.begin(),
+                                                             map.end());
   opened_blob_buffer_ = (char *)malloc(FILE_BLOB_SIZE);
   opened_blob_ = FIRST_DATA_BLOB;
   if (tb_read_blob(opened_blob_, opened_blob_buffer_) < 0) {
     printf("ERROR: could not read blob for scanner\n");
     exit(EXIT_FAILURE);
   }
-  iterator_ = map_.begin();
+  iterator_ = map_->begin();
 };
 
 char *scanner_handle_t::get_key() {
@@ -30,7 +31,26 @@ char *scanner_handle_t::get_key() {
   return NULL;
 };
 
-char *scanner_handle_t::get_value() { return NULL; }
+char *scanner_handle_t::get_value() {
+
+  if (iterator_->second.blob_id != opened_blob_) {
+    memset(opened_blob_buffer_, 0, FILE_BLOB_SIZE);
+    tb_read_blob(iterator_->second.blob_id, opened_blob_buffer_);
+  }
+  uint32_t value_size;
+  uint32_t key_size = iterator_->first.size();
+
+  memcpy(&value_size,
+         opened_blob_buffer_ + iterator_->second.blob_offset + sizeof(uint32_t),
+         sizeof(uint32_t));
+
+  char *value = (char *)malloc(value_size);
+  memcpy(value,
+         opened_blob_buffer_ + iterator_->second.blob_offset +
+             2 * sizeof(uint32_t) + key_size,
+         value_size);
+  return value;
+}
 
 int tiny_index::erase(char *key) { return !lookup_.erase(key); }
 

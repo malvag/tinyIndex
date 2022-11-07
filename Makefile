@@ -6,7 +6,7 @@ TEST= test.o
 CXX=g++
 TEST_BLOCK=test_block.o
 
-LIBRARY_OBJ= src/allocator.o src/scanner.o  src/index.o 
+LIBRARY_OBJ= src/tiny_allocator.o src/tiny_scanner.o  src/tiny_index.o 
 LIBRARY= libtiny.a
 
 all: clean test
@@ -18,7 +18,7 @@ src/%.o: src/%.cpp
 %.o: %.c
 	$(CXX) $(CXXFLAGS)  -c $^ -o $@
 
-test: $(TEST_BLOCK) $(LIBRARY_OBJ)
+test:	$(TEST_BLOCK) $(LIBRARY_OBJ)
 	$(CXX) $(CXXFLAGS)  $^ -o test
 
 library: $(LIBRARY_OBJ)

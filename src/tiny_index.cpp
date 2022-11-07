@@ -1,4 +1,4 @@
-#include "../include/index.h"
+#include "tiny_index.h"
 #include <malloc.h>
 #include <stdlib.h>
 #include <string.h>

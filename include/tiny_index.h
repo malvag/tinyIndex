@@ -3,7 +3,7 @@
 #include <memory>
 #include <unordered_map>
 
-#include "allocator.h"
+#include "tiny_allocator.h"
 
 #define LOOKUP_TABLE_BLOB_ID 0
 #define OFFSET_IN_BLOB(bid) FILE_BLOB_SIZE - tb_handle->table[bid]->size_used

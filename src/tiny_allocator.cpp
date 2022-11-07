@@ -10,7 +10,7 @@
 
 #define BLOCK_TINYBLOB
 
-#include "../include/allocator.h"
+#include "tiny_allocator.h"
 
 struct tiny_blob_handle_t *tb_handle = NULL;
 

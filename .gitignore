@@ -4,3 +4,4 @@ store_data/
 test
 
 src/aio*
+YCSB-C/
