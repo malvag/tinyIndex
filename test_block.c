@@ -10,7 +10,7 @@ int main(int argc, char **argv) {
 
   std::string key;
   std::string value;
-  tiny_index blob_idx;
+  tiny_index blob_idx, second_idx;
   blob_idx.recover(argv[1]);
   for (int i = 0; i < 1000; i++) {
     key = "malvag" + std::to_string(i);
@@ -22,24 +22,30 @@ int main(int argc, char **argv) {
   }
 
   char *value_buffer = NULL;
+  blob_idx.persist(argv[1]);
+
+
+  second_idx.recover(argv[1]);
 
   for (int i = 0; i < 1000; i++) {
     key = "malvag" + std::to_string(i);
-    value_buffer = blob_idx.get((char *)key.c_str());
+    value_buffer = second_idx.get((char *)key.c_str());
+    
     std::cout << value_buffer << '\n';
     if (value_buffer != NULL)
       free(value_buffer);
   }
 
-  scanner_handle_t *scanr = blob_idx.scan_init();
+  scanner_handle_t *scanr = second_idx.scan_init();
   int i = 0;
-  while (!blob_idx.get_next(scanr)) {
-    char *out = blob_idx.get_scan_key(scanr);
-    // if (out)
+  while (!second_idx.get_next(scanr)) {
+    char *out = second_idx.get_scan_key(scanr);
     printf("[%d] %s\n", i++, out);
+    if (out)
+      free(out);
   }
-  blob_idx.close_scanner(scanr);
-  blob_idx.persist(argv[1]);
+  second_idx.close_scanner(scanr);
+  second_idx.persist(argv[1]);
 
   return 0;
 }

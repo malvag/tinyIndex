@@ -98,7 +98,7 @@ void tb_init(char *location) {
            tb_handle->table_size);*/
   } else {
     posix_memalign((void **)&tb_handle, FS_LOGICAL_BLK_SIZE,
-                   sizeof(tiny_blob_handle_t));
+                   round_up_to_blksize(sizeof(tiny_blob_handle_t)));
     tb_handle->table_size = MAX_BLOBS;
     tb_handle->bidno = 0;
     tb_handle->table = (blob **)calloc(tb_handle->table_size, sizeof(blob *));
@@ -184,8 +184,8 @@ int tb_write_blob(bid_t blob_id, void *data) {
 
   int ret = pwrite(tb_handle->file_descriptor, data_aligned, FILE_BLOB_SIZE,
                    DATA_OFFSET + b->block_id * FILE_BLOB_SIZE);
-  // free(data_aligned);
   RWLOCK_UNLOCK(tb_handle->lock);
+  free(data_aligned);
   if (ret < 0) {
     printf("%s: %s: Could not write blob with bid %lu\n", strerror(errno),
            __func__, b->id);
@@ -258,6 +258,7 @@ void tb_shutdown(void) {
   for (uint32_t i = 0; i < tb_handle->bidno; ++i) {
     free(tb_handle->table[i]);
   }
+  free(tb_handle->location);
   free(tb_handle->table);
   free(tb_handle);
 }

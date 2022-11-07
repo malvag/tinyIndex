@@ -9,7 +9,7 @@ public:
   scanner_handle_t(
       std::unordered_map<std::string, struct lookup_index_node> map);
   int go_to_next();
-
+  ~scanner_handle_t();
   char *get_key();
   char *get_value();
 

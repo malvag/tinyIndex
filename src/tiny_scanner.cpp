@@ -54,6 +54,11 @@ char *scanner_handle_t::get_value() {
 
 int tiny_index::erase(char *key) { return !lookup_.erase(key); }
 
+scanner_handle_t::~scanner_handle_t(){
+  free(opened_blob_buffer_);
+  delete map_;
+}
+
 scanner_handle_t *tiny_index::scan_init(void) {
   scanner_handle_t *scanner = new scanner_handle_t(lookup_);
   return scanner;
@@ -68,6 +73,7 @@ char *tiny_index::get_scan_value(scanner_handle_t *scanner) {
 }
 
 int tiny_index::close_scanner(scanner_handle_t *scanner) {
+
   delete scanner;
   scanner = NULL;
   return 0;

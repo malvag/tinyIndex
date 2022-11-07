@@ -18,9 +18,9 @@ int tiny_index::put(char *key, char *value) {
     // if exists in lookup table
     lookup_.erase(key);
   }
-  uint32_t key_size = strlen(key);
+  uint32_t key_size = strlen(key) + 1;
   // TODO:find a solution regarding value size
-  uint32_t value_size = strlen(value);
+  uint32_t value_size = strlen(value) + 1;
 
   // Create kv_pair
   // NOTE: can write it into a function
@@ -69,6 +69,8 @@ int tiny_index::put(char *key, char *value) {
   // TODO: should free but crrently i get abort
   free(blob_buffer);
   blob_buffer = NULL;
+  free(kv->key);
+  free(kv->value);
   free(kv);
   kv = NULL;
 
@@ -124,8 +126,6 @@ char *tiny_index::get(char *key) {
   return value_buffer;
 }
 
-
-
 void tiny_index::persist(char *location) {
   assert(handle_ != NULL);
   persist_unordered_map();
@@ -154,7 +154,7 @@ void tiny_index::recover_unordered_map() {
     // save blob_ids that should contain the rest of the tiny_index data
   } else {
     // if index exists
-    // for every block
+    // for every block -> recover every kv pair
     bid_t current_block = LOOKUP_TABLE_BLOB_ID;
     char *buffer = (char *)malloc(FILE_BLOB_SIZE);
     int first_block = 1;
@@ -206,7 +206,7 @@ void tiny_index::recover_unordered_map() {
            sizeof(kv_pair->key_size) + kv_pair->key_size +
            sizeof(kv_pair->value_size), kv_pair->value_size);
         */
-        lookup_.emplace(std::string(kv_pair->key), lnode);
+        lookup_.emplace(std::string(kv_pair->key, kv_pair->key_size), lnode);
         free(kv_pair->key);
         //      free(kv_pair->value);
         free(kv_pair);
@@ -216,6 +216,7 @@ void tiny_index::recover_unordered_map() {
       printf("Recovered %d kvpairs from blob %u\n", i, current_block);
       current_block = lindex->next_blob_id;
       first_block = 0;
+      free(lindex);
     }
     //  build unordered map with data from this blob
     //  if end of blob: continue to the next blob(if exists) and repeat
@@ -256,8 +257,11 @@ void tiny_index::persist_unordered_map() {
         exit(EXIT_FAILURE);
       }
       //  lets allocate a new buffer for the next blob
-      lindex =
-          (lookup_index *)memalign(FS_LOGICAL_BLK_SIZE, sizeof(lookup_index));
+      // first free the previous one
+      free(lindex);
+      // TODO: figure out the size of a lindex block
+      // NOTE: for now lets allocate the whole blob
+      lindex = (lookup_index *)memalign(FS_LOGICAL_BLK_SIZE, FILE_BLOB_SIZE);
       lindex->next_blob_id = 0;
       // and now write the rest of the keys to the next blob
       current_blob_id = next_blob_id;
