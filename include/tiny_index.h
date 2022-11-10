@@ -1,9 +1,9 @@
 #pragma once
 
+#include "tiny_allocator.h"
+#include "tiny_log.h"
 #include <memory>
 #include <unordered_map>
-
-#include "tiny_allocator.h"
 
 #define LOOKUP_TABLE_BLOB_ID 0
 #define OFFSET_IN_BLOB(bid) FILE_BLOB_SIZE - tb_handle->table[bid]->size_used
@@ -27,7 +27,7 @@ struct lookup_index {
   bid_t next_blob_id;
   uint32_t map_size;
 } __attribute__((__packed__));
-
+class log_handle_t;
 class scanner_handle_t;
 // typedef struct blob blob_t;
 class tiny_index {
@@ -37,6 +37,7 @@ private:
 
 public:
   tiny_blob_handle_t *handle_ = nullptr;
+  log_handle_t *log_handle_ = nullptr;
   std::unordered_map<std::string, lookup_index_node> lookup_;
 
   // Return 0 on success -1 on failure.

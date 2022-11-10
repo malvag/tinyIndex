@@ -7,6 +7,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include "utilities.h"
 
 #define BLOCK_TINYBLOB
 
@@ -88,7 +89,7 @@ void tb_init(char *location) {
     printf("ERROR: Should have a location to run on!\n");
     return;
   }
-  char *handle_file = get_filepath(location, "db.bin");
+  char *handle_file = get_filepath(location, DB_FILE_NAME);
 
   // if we dont find a store inside location then create one
   if (access(handle_file, F_OK) != -1) {

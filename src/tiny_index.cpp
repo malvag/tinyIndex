@@ -1,11 +1,11 @@
 #include "tiny_index.h"
-#include <malloc.h>
-#include <stdlib.h>
-#include <string.h>
-
+#include "tiny_log.h"
 #include <cassert>
 #include <cstdint>
 #include <cstdlib>
+#include <malloc.h>
+#include <stdlib.h>
+#include <string.h>
 
 extern struct tiny_blob_handle_t *tb_handle;
 
@@ -33,6 +33,9 @@ int tiny_index::put(char *key, char *value) {
 
   uint32_t true_kvsize = sizeof(kv->key_size) + kv->key_size +
                          sizeof(kv->value_size) + kv->value_size;
+
+  // add to WAL
+  log_handle_->append(kv);
   // RMW
   char *blob_buffer = (char *)memalign(FS_LOGICAL_BLK_SIZE, FILE_BLOB_SIZE);
   bid_t available_blob_id = find_next_available_blob(true_kvsize);
@@ -132,12 +135,14 @@ void tiny_index::persist(char *location) {
   printf("Persisted %d keys and kv_metadata in %d blobs\n", lookup_.size(),
          tb_handle->bidno);
   tb_shutdown();
+  delete log_handle_;
 }
 
 void tiny_index::recover(char *location) {
   tb_init(location);
   handle_ = tb_handle;
   recover_unordered_map();
+  log_handle_ = new log_handle_t(location);
   printf("allocator blob_meta size %d\n", handle_->bidno);
 }
 

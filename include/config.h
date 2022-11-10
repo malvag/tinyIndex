@@ -18,11 +18,8 @@
 
 // allocator
 /*
-             | ---- ----------- superblock  ----- -------- |-------- data
-  -------------- --
-  -
-  - db.bin:  |  tiny_blob_handle_t  |  BITMAP  | BLOBS_META | LOOKUP_TABLE |
-  BLOB_VALUE0 - BLOB_VALUE1 - -
+  - db.bin:
+  | tiny_blob_handle_t | BITMAP | BLOBS_META | LOOKUP_TABLE | BLOBS + INDEX |
   -
 
 */
@@ -40,5 +37,11 @@
 #define DB_FILE_SIZE                                                           \
   ((MAX_BLOBS * DEVICE_BLOCK_SIZE) + HANDLE_FILE_SIZE + BITMAP_FILE_SIZE +     \
    BLOBS_META_FILE_SIZE)
+
+#define LOG_BUFFER_SIZE 2048
+#define LOG_FILE_SIZE (16LU * 1024LU * 10 * LOG_BUFFER_SIZE) // 320MB
+
+#define DB_FILE_NAME "db.bin"
+#define LOG_FILE_NAME "log.bin"
 
 #endif
