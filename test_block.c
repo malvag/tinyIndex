@@ -12,7 +12,7 @@ int main(int argc, char **argv) {
   std::string value;
   tiny_index blob_idx, second_idx;
   blob_idx.recover(argv[1]);
-  for (int i = 0; i < 1000; i++) {
+  for (int i = 0; i < 10000; i++) {
     key = "malvag" + std::to_string(i);
     value = "adata" + std::to_string(i);
     blob_idx.put((char *)key.c_str(), (char *)value.c_str());
@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
 
   second_idx.recover(argv[1]);
 
-  for (int i = 0; i < 1000; i++) {
+  for (int i = 0; i < 10000; i++) {
     key = "malvag" + std::to_string(i);
     value_buffer = second_idx.get((char *)key.c_str());
     

@@ -26,6 +26,7 @@ struct tiny_blob_handle_t {
   bid_t bidno;
   bid_t table_size;
 
+  off_t log_offset;
   pthread_rwlock_t *lock;
   pthread_rwlockattr_t *lock_attr;
   int file_descriptor;

@@ -10,19 +10,26 @@ class log_handle_t {
 
     int truncate(tiny_index *index);  // Truncates the existing log, return 1 on
                                       // success 0 on failure
-    int log_read();  // debug function only
+    int log_read();                   // debug function only
     int replay(tiny_index *index);
 
     int replay();  // recover actions from log
+
+    pthread_rwlock_t* get_lock();
     ~log_handle_t();
+    log_handle_t(char *location, tiny_index *index);
 
    private:
-
+    int init_rwlock();
+    void destroy_rwlock();
     int try_write_to_log_buffer(struct tiny_kv_pair *);
     tiny_kv_pair *try_read_from_log_buffer();
     void allocate_new_log_write_buffer();
     void allocate_new_log_read_buffer();
 
+    pthread_t gc_thread_id_;
+    pthread_rwlock_t *lock_;
+    pthread_rwlockattr_t *lock_attr_;
     log_handle_t();
     int fd_;
 

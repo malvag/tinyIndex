@@ -17,22 +17,31 @@
 #include "utilities.h"
 class tiny_index;
 
-void checkpoint_and_truncate(tiny_index *index) {
+void *checkpoint_and_truncate(void *arg) {
+    sleep(1);
+    tiny_index *index = (tiny_index *)arg;
+    log_handle_t* log_hdl  =index->get_log_handle();
+    pthread_rwlock_t *lock_ = log_hdl->get_lock();
     while (!index->get_index_status_done_()) {
         // checkpoint
         // assert(tb_handle != NULL);
+        RWLOCK_WRLOCK(lock_);
         index->persist_unordered_map();
         printf("Persisted %d keys and kv_metadata\n", index->lookup_.size());
 
         // truncate
         index->get_log_handle()->truncate(index);
+        RWLOCK_UNLOCK(lock_);
 
-        sleep(2);
+        sleep(10);
     }
+    return NULL;
 }
 
-log_handle_t *tiny_index::get_log_handle() { return log_handle_; }
-int tiny_index::get_index_status_done_() { return index_status_done_; }
+tiny_blob_handle_t* tiny_index::get_blob_handle(){
+    return handle_;
+}
+pthread_rwlock_t *log_handle_t::get_lock() { return lock_; }
 
 void log_handle_t::allocate_new_log_write_buffer() {
     if (write_buffer_ != NULL) free(write_buffer_);
@@ -48,11 +57,34 @@ void log_handle_t::allocate_new_log_read_buffer() {
     read_buffer_offset_ = 0;
 }
 
+int log_handle_t::init_rwlock() {
+    pthread_rwlock_t *rwlock =
+        (pthread_rwlock_t *)malloc(sizeof(pthread_rwlock_t));
+    pthread_rwlockattr_t *rwlock_attr =
+        (pthread_rwlockattr_t *)malloc(sizeof(pthread_rwlock_t));
+    pthread_rwlockattr_init(rwlock_attr);
+    pthread_rwlockattr_setpshared(rwlock_attr, PTHREAD_PROCESS_SHARED);
+    if (pthread_rwlock_init(rwlock, rwlock_attr) == 0) {
+        lock_ = rwlock;
+        lock_attr_ = rwlock_attr;
+        return 0;
+    }
+    return -1;
+}
+
+void log_handle_t::destroy_rwlock() {
+    pthread_rwlockattr_destroy(lock_attr_);
+    free(lock_attr_);
+    pthread_rwlock_destroy(lock_);
+    free(lock_);
+}
+
 void log_handle_t::append(tiny_kv_pair *kv) {
     // since we have O_APPEND we get the offset
     ssize_t amount_written, position;
 
     /* Write out the data.  */
+    RWLOCK_WRLOCK(lock_);
     lseek(fd_, write_log_offset_, SEEK_SET);
     if (try_write_to_log_buffer(kv) < 0) {
         // if we dont have any free space inside the buffer
@@ -73,37 +105,36 @@ void log_handle_t::append(tiny_kv_pair *kv) {
             perror("Could not get cursor in log");
             return;
         }
-        //    printf("Persisted kvs into log\n", kv->key, kv->value);
+        // printf("Persisted kvs into log\n");
         allocate_new_log_write_buffer();
         if (try_write_to_log_buffer(kv) == -1) return;
     } else {
-        printf("Stored kv[%s:%s] into buffer, offset %zu\n", kv->key, kv->value,
-               write_buffer_offset_);
+        // printf("Stored kv[%s:%s] into buffer, offset %zu\n", kv->key, kv->value,
+        //        write_buffer_offset_);
     }
-
-    //   return -1;
+    RWLOCK_UNLOCK(lock_);
 }
 
 // Writes kv to write_buffer_ at write_buffer_offset_
 // and increments the write_buffer_offset_ with the size of kv
-int write_kv_to_buffer(char *buf, uint32_t buf_size, off_t offset,
+int write_kv_to_buffer(char *buf, uint32_t buf_size, off_t *offset,
                        tiny_kv_pair *kv) {
     uint32_t true_kvsize = sizeof(kv->key_size) + kv->key_size +
                            sizeof(kv->value_size) + kv->value_size;
-    if (buf_size <= true_kvsize + offset) return -1;
+    if (buf_size <= true_kvsize + *offset) return -1;
     // construct tiny_kv_pair buffer
-    memcpy(buf + offset, &kv->key_size, sizeof(kv->key_size));
+    memcpy(buf + *offset, &kv->key_size, sizeof(kv->key_size));
 
-    memcpy(buf + offset + sizeof(kv->key_size), &kv->value_size,
+    memcpy(buf + *offset + sizeof(kv->key_size), &kv->value_size,
            sizeof(kv->value_size));
 
-    memcpy(buf + offset + sizeof(kv->key_size) + sizeof(kv->value_size),
+    memcpy(buf + *offset + sizeof(kv->key_size) + sizeof(kv->value_size),
            kv->key, kv->key_size);
 
-    memcpy(buf + offset + sizeof(kv->key_size) + kv->key_size +
+    memcpy(buf + *offset + sizeof(kv->key_size) + kv->key_size +
                sizeof(kv->value_size),
            kv->value, kv->value_size);
-    offset += true_kvsize;
+    *offset += true_kvsize;
     return 0;
 }
 
@@ -111,7 +142,7 @@ int write_kv_to_buffer(char *buf, uint32_t buf_size, off_t offset,
 // and increments the write_buffer_offset_ with the size of kv
 int log_handle_t::try_write_to_log_buffer(tiny_kv_pair *kv) {
     return write_kv_to_buffer(write_buffer_, write_buffer_size_,
-                              write_buffer_offset_, kv);
+                              &write_buffer_offset_, kv);
 }
 
 // Reads next kv from read_buffer_offset_ from read_buffer_
@@ -148,6 +179,7 @@ tiny_kv_pair *log_handle_t::try_read_from_log_buffer() {
     return kv_pair;
 }
 
+// is lock-protected from calller
 int log_handle_t::truncate(tiny_index *index) {
     allocate_new_log_read_buffer();
     read_padding_ = 0;
@@ -168,8 +200,8 @@ int log_handle_t::truncate(tiny_index *index) {
         perror("Could not read file");
     }
     while (ret > 0) {
-        printf("Read_log_offset %ld and populated read_buffer %d times\n",
-               read_log_offset_, i++);
+        // printf("Read_log_offset %ld and populated read_buffer %d times\n",
+        //        read_log_offset_, i++);
 
         // if value in kv is NULL, then populate a buffer with every key next to
         // it and shift to file's beginning
@@ -181,11 +213,11 @@ int log_handle_t::truncate(tiny_index *index) {
                 // put this buffer and the rest back to the beggining of the log
                 write_kv_to_buffer(write_shifted_buffer,
                                    write_shifted_buffer_size,
-                                   write_shifted_buffer_offset, kv_pair);
+                                   &write_shifted_buffer_offset, kv_pair);
             }
-            free(kv_pair);
-            free(kv_pair->key);
-            free(kv_pair->value);
+            // free(kv_pair);
+            // free(kv_pair->key);
+            // free(kv_pair->value);
         }
 
         printf("Recovered %d kv_pairs\n", keys);
@@ -208,6 +240,7 @@ int log_handle_t::truncate(tiny_index *index) {
 }
 
 int log_handle_t::replay(tiny_index *index) {
+    RWLOCK_WRLOCK(lock_);
     allocate_new_log_read_buffer();
     read_padding_ = 0;
     read_buffer_offset_ = 0;
@@ -244,6 +277,7 @@ int log_handle_t::replay(tiny_index *index) {
         read_buffer_offset_ = 0;
         ret = pread(fd_, read_buffer_, read_buffer_size_, read_log_offset_);
     }
+    RWLOCK_UNLOCK(lock_);
     return 0;
 }
 
@@ -283,17 +317,31 @@ int log_handle_t::log_read() {
 }
 
 log_handle_t::~log_handle_t() {
+    RWLOCK_WRLOCK(lock_);
     close(fd_);
     if (read_buffer_) free(read_buffer_);
 
     if (write_buffer_) free(write_buffer_);
+    RWLOCK_UNLOCK(lock_);
+    destroy_rwlock();
 }
 
-log_handle_t::log_handle_t(char *location) {
+log_handle_t::log_handle_t(char *location, tiny_index *index) {
+    init_rwlock();
+    RWLOCK_WRLOCK(lock_);
     assert(location != NULL);
     char *log_file = get_filepath(location, LOG_FILE_NAME);
     write_buffer_ = NULL;
     read_buffer_ = NULL;
+    write_log_offset_ = 0;
+
+    int ret =
+        pthread_create(&gc_thread_id_, NULL, checkpoint_and_truncate, index);
+    if (ret) {
+        printf("Error: creating gc thread\n");
+        exit(EXIT_FAILURE);
+    }
+
     if (access(log_file, F_OK) != -1) {
         // recover
         fd_ = open(log_file, O_CREAT | O_RDWR | O_DSYNC | O_DIRECT, 0600);
@@ -302,6 +350,7 @@ log_handle_t::log_handle_t(char *location) {
                    log_file);
         }
         allocate_new_log_write_buffer();
+        write_log_offset_ = index->get_blob_handle()->log_offset;
         // replay();
     } else {
         // create a new log
@@ -321,5 +370,7 @@ log_handle_t::log_handle_t(char *location) {
         }
         printf("INFO: fallocated the file\n");
         allocate_new_log_write_buffer();
+        write_log_offset_ = 0;
     }
+    RWLOCK_UNLOCK(lock_);
 }
