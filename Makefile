@@ -2,9 +2,10 @@ CXXFLAGS = -g  -D_GNU_SOURCE -I$(INCLUDE) #-fsanitize=address
 
 
 INCLUDE=include/
+TEST= test.o
 CXX=g++
+# TEST=test_block.o
 TEST=test_block.o
-# TEST=test_log.o
 
 LIBRARY_OBJ= src/tiny_allocator.o src/tiny_log.o src/tiny_scanner.o  src/tiny_index.o 
 LIBRARY= libtiny.a

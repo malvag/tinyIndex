@@ -34,9 +34,11 @@ int tiny_index::put(char *key, char *value) {
   uint32_t true_kvsize = sizeof(kv->key_size) + kv->key_size +
                          sizeof(kv->value_size) + kv->value_size;
 
+#ifdef USE_LOG
   // add to WAL
+  log_handle_->append(kv);
+#endif
 
-  // log_handle_->append(kv);
   // RMW
   char *blob_buffer = (char *)memalign(FS_LOGICAL_BLK_SIZE, FILE_BLOB_SIZE);
   bid_t available_blob_id = find_next_available_blob(true_kvsize);
@@ -103,7 +105,7 @@ char *tiny_index::get(char *key) {
 
   bid_t kv_blob_id = found->second.blob_id;
 
-  char *blob_buffer = (char *)malloc(FILE_BLOB_SIZE);
+  char *blob_buffer = (char *)memalign(FS_LOGICAL_BLK_SIZE, FILE_BLOB_SIZE);
   assert(kv_blob_id > 0);
 
   if (tb_read_blob(kv_blob_id, blob_buffer) < 0) {
@@ -120,6 +122,7 @@ char *tiny_index::get(char *key) {
 
   assert(value_size > 0);
   assert(value_size < found->second.tiny_kv_pair_size);
+
   value_buffer = (char *)malloc(value_size);
   memcpy(value_buffer,
          blob_buffer + found->second.blob_offset + sizeof(key_size) + key_size +
@@ -127,6 +130,7 @@ char *tiny_index::get(char *key) {
          value_size);
 
   // user should free the buffer after use.
+  free(blob_buffer);
   return value_buffer;
 }
 
@@ -136,14 +140,18 @@ void tiny_index::persist(char *location) {
   printf("Persisted %d keys and kv_metadata in %d blobs\n", lookup_.size(),
          tb_handle->bidno);
   tb_shutdown();
+#ifdef USE_LOG
   delete log_handle_;
+#endif
 }
 
 void tiny_index::recover(char *location) {
   tb_init(location);
   handle_ = tb_handle;
   recover_unordered_map();
+#ifdef USE_LOG
   log_handle_ = new log_handle_t(location);
+#endif
   printf("allocator blob_meta size %d\n", handle_->bidno);
 }
 
