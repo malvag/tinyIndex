@@ -3,8 +3,8 @@
 #include <cstdint>
 #include <string.h>
 int scanner_handle_t::go_to_next() {
+  iterator_++;
   if (iterator_ != map_->end()) {
-    iterator_++;
     return 0;
   }
   return -1;
@@ -24,7 +24,7 @@ scanner_handle_t::scanner_handle_t(
   iterator_ = map_->begin();
 };
 
-char *scanner_handle_t::get_key() {
+char *scanner_handle_t::get_key() {  
   if (!iterator_->first.empty())
     return strdup(iterator_->first.c_str());
 

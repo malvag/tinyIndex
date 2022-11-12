@@ -38,7 +38,9 @@ int main(int argc, char **argv) {
 
   scanner_handle_t *scanr = second_idx.scan_init();
   int i = 0;
-  while (!second_idx.get_next(scanr)) {
+  while (1) {
+    if(second_idx.get_next(scanr))
+      break;
     char *out = second_idx.get_scan_key(scanr);
     printf("[%d] %s\n", i++, out);
     if (out)

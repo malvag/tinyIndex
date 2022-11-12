@@ -35,7 +35,8 @@ int tiny_index::put(char *key, char *value) {
                          sizeof(kv->value_size) + kv->value_size;
 
   // add to WAL
-  log_handle_->append(kv);
+
+  // log_handle_->append(kv);
   // RMW
   char *blob_buffer = (char *)memalign(FS_LOGICAL_BLK_SIZE, FILE_BLOB_SIZE);
   bid_t available_blob_id = find_next_available_blob(true_kvsize);
