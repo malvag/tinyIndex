@@ -8,7 +8,7 @@
 #include <string>
 
 int main(int argc, char **argv) {
-  log_handle_t* wal = new log_handle_t(argv[1]);
+  log_handle* wal = new log_handle(argv[1]);
   for (int i = 0; i < 100; i++) {
     tiny_kv_pair *kv = (tiny_kv_pair *)malloc(sizeof(tiny_kv_pair));
     std::string key = std::string("malvag") + std::to_string(i);

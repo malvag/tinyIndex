@@ -20,9 +20,10 @@ class tiny_index;
 void *checkpoint_and_truncate(void *arg) {
     sleep(1);
     tiny_index *index = (tiny_index *)arg;
-    log_handle_t* log_hdl  =index->get_log_handle();
+    log_handle* log_hdl  =index->get_log_handle();
     pthread_rwlock_t *lock_ = log_hdl->get_lock();
     while (!index->get_index_status_done_()) {
+        sleep(10);
         // checkpoint
         // assert(tb_handle != NULL);
         RWLOCK_WRLOCK(lock_);
@@ -33,7 +34,6 @@ void *checkpoint_and_truncate(void *arg) {
         index->get_log_handle()->truncate(index);
         RWLOCK_UNLOCK(lock_);
 
-        sleep(10);
     }
     return NULL;
 }
@@ -41,23 +41,23 @@ void *checkpoint_and_truncate(void *arg) {
 tiny_blob_handle_t* tiny_index::get_blob_handle(){
     return handle_;
 }
-pthread_rwlock_t *log_handle_t::get_lock() { return lock_; }
+pthread_rwlock_t *log_handle::get_lock() { return lock_; }
 
-void log_handle_t::allocate_new_log_write_buffer() {
+void log_handle::allocate_new_log_write_buffer() {
     if (write_buffer_ != NULL) free(write_buffer_);
     write_buffer_ = (char *)calloc(1, LOG_BUFFER_SIZE);
     write_buffer_size_ = LOG_BUFFER_SIZE;
     write_buffer_offset_ = 0;
 }
 
-void log_handle_t::allocate_new_log_read_buffer() {
+void log_handle::allocate_new_log_read_buffer() {
     if (read_buffer_ != NULL) free(read_buffer_);
     read_buffer_ = (char *)memalign(FS_LOGICAL_BLK_SIZE, LOG_BUFFER_SIZE);
     read_buffer_size_ = LOG_BUFFER_SIZE;
     read_buffer_offset_ = 0;
 }
 
-int log_handle_t::init_rwlock() {
+int log_handle::init_rwlock() {
     pthread_rwlock_t *rwlock =
         (pthread_rwlock_t *)malloc(sizeof(pthread_rwlock_t));
     pthread_rwlockattr_t *rwlock_attr =
@@ -72,14 +72,14 @@ int log_handle_t::init_rwlock() {
     return -1;
 }
 
-void log_handle_t::destroy_rwlock() {
+void log_handle::destroy_rwlock() {
     pthread_rwlockattr_destroy(lock_attr_);
     free(lock_attr_);
     pthread_rwlock_destroy(lock_);
     free(lock_);
 }
 
-void log_handle_t::append(tiny_kv_pair *kv) {
+void log_handle::append(tiny_kv_pair *kv) {
     // since we have O_APPEND we get the offset
     ssize_t amount_written, position;
 
@@ -140,14 +140,14 @@ int write_kv_to_buffer(char *buf, uint32_t buf_size, off_t *offset,
 
 // Writes kv to write_buffer_ at write_buffer_offset_
 // and increments the write_buffer_offset_ with the size of kv
-int log_handle_t::try_write_to_log_buffer(tiny_kv_pair *kv) {
+int log_handle::try_write_to_log_buffer(tiny_kv_pair *kv) {
     return write_kv_to_buffer(write_buffer_, write_buffer_size_,
                               &write_buffer_offset_, kv);
 }
 
 // Reads next kv from read_buffer_offset_ from read_buffer_
 // and increments the read_buffer_offset_ with the size of kv
-tiny_kv_pair *log_handle_t::try_read_from_log_buffer() {
+tiny_kv_pair *log_handle::try_read_from_log_buffer() {
     uint32_t key_size = 0;
     memcpy(&key_size, read_buffer_ + read_buffer_offset_, sizeof(uint32_t));
     if (!key_size) return NULL;
@@ -180,14 +180,13 @@ tiny_kv_pair *log_handle_t::try_read_from_log_buffer() {
 }
 
 // is lock-protected from calller
-int log_handle_t::truncate(tiny_index *index) {
+int log_handle::truncate(tiny_index *index) {
     allocate_new_log_read_buffer();
     read_padding_ = 0;
     read_buffer_offset_ = 0;
     short exitFlag = 0;
     ssize_t ret = 0;
     int i = 0;
-    int keys = 0;
     tiny_kv_pair *kv_pair = NULL;
     off_t l = lseek(fd_, 0, SEEK_SET);
     ret = read(fd_, read_buffer_, read_buffer_size_);
@@ -200,9 +199,6 @@ int log_handle_t::truncate(tiny_index *index) {
         perror("Could not read file");
     }
     while (ret > 0) {
-        // printf("Read_log_offset %ld and populated read_buffer %d times\n",
-        //        read_log_offset_, i++);
-
         // if value in kv is NULL, then populate a buffer with every key next to
         // it and shift to file's beginning
 
@@ -219,9 +215,6 @@ int log_handle_t::truncate(tiny_index *index) {
             // free(kv_pair->key);
             // free(kv_pair->value);
         }
-
-        printf("Recovered %d kv_pairs\n", keys);
-
         if (read_buffer_offset_ == 0 && kv_pair == NULL) break;
 
         // get next buffer from log file
@@ -239,7 +232,7 @@ int log_handle_t::truncate(tiny_index *index) {
     return 0;
 }
 
-int log_handle_t::replay(tiny_index *index) {
+int log_handle::replay(tiny_index *index) {
     RWLOCK_WRLOCK(lock_);
     allocate_new_log_read_buffer();
     read_padding_ = 0;
@@ -255,17 +248,14 @@ int log_handle_t::replay(tiny_index *index) {
         perror("Could not read file");
     }
     while (ret > 0) {
-        printf("Read_log_offset %ld and populated read_buffer %d times\n",
-               read_log_offset_, i++);
-
         while ((kv_pair = try_read_from_log_buffer()) != NULL) {
             char *val_buf = index->get(kv_pair->key);
             if (val_buf == NULL) {
                 index->put(kv_pair->key, kv_pair->value);
             }
-            free(kv_pair);
-            free(kv_pair->key);
-            free(kv_pair->value);
+            // free(kv_pair);
+            // free(kv_pair->key);
+            // free(kv_pair->value);
         }
 
         printf("Recovered %d kv_pairs\n", keys);
@@ -281,42 +271,7 @@ int log_handle_t::replay(tiny_index *index) {
     return 0;
 }
 
-int log_handle_t::log_read() {
-    printf("Replay() -> \n");
-    allocate_new_log_read_buffer();
-    read_padding_ = 0;
-    read_buffer_offset_ = 0;
-    short exitFlag = 0;
-    ssize_t ret = 0;
-    int i = 0;
-    int keys = 0;
-    tiny_kv_pair *kv_pair = NULL;
-    off_t l = lseek(fd_, 0, SEEK_SET);
-    ret = read(fd_, read_buffer_, read_buffer_size_);
-    if (ret == -1) {
-        perror("Could not read file");
-    }
-    while (ret > 0) {
-        printf("Read_log_offset %ld and populated read_buffer %d times\n",
-               read_log_offset_, i++);
-
-        while ((kv_pair = try_read_from_log_buffer()) != NULL) {
-            keys++;
-        }
-
-        printf("Recovered %d kv_pairs\n", keys);
-
-        if (read_buffer_offset_ == 0 && kv_pair == NULL) break;
-
-        // get next buffer from log file
-        read_log_offset_ += LOG_BUFFER_SIZE;
-        read_buffer_offset_ = 0;
-        ret = pread(fd_, read_buffer_, read_buffer_size_, read_log_offset_);
-    }
-    return -1;
-}
-
-log_handle_t::~log_handle_t() {
+log_handle::~log_handle() {
     RWLOCK_WRLOCK(lock_);
     close(fd_);
     if (read_buffer_) free(read_buffer_);
@@ -326,17 +281,29 @@ log_handle_t::~log_handle_t() {
     destroy_rwlock();
 }
 
-log_handle_t::log_handle_t(char *location, tiny_index *index) {
-    init_rwlock();
-    RWLOCK_WRLOCK(lock_);
+log_handle::log_handle(char *location, tiny_index *index) {
     assert(location != NULL);
     char *log_file = get_filepath(location, LOG_FILE_NAME);
     write_buffer_ = NULL;
     read_buffer_ = NULL;
     write_log_offset_ = 0;
+    int rc;
 
+    rc = pthread_attr_init(&attr);                                               
+    if (rc) {                                                              
+        perror("ERROR: in pthread_attr_init");                                     
+        exit(1);                                                                  
+    }                                                                            
+                                                                                  
+    rc = pthread_attr_setdetachstate(&attr, 0); // detached state                                
+    if (rc) {                                                              
+        perror("ERROR: in pthread_attr_setdetachstate");                           
+        exit(2);                                                                  
+    }          
     int ret =
         pthread_create(&gc_thread_id_, NULL, checkpoint_and_truncate, index);
+    init_rwlock();
+    RWLOCK_WRLOCK(lock_);
     if (ret) {
         printf("Error: creating gc thread\n");
         exit(EXIT_FAILURE);
@@ -372,5 +339,6 @@ log_handle_t::log_handle_t(char *location, tiny_index *index) {
         allocate_new_log_write_buffer();
         write_log_offset_ = 0;
     }
+    free(log_file);
     RWLOCK_UNLOCK(lock_);
 }

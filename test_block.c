@@ -31,7 +31,6 @@ int main(int argc, char **argv) {
     key = "malvag" + std::to_string(i);
     value_buffer = second_idx.get((char *)key.c_str());
     
-    std::cout << value_buffer << '\n';
     if (value_buffer != NULL)
       free(value_buffer);
   }
@@ -42,7 +41,7 @@ int main(int argc, char **argv) {
     if(second_idx.get_next(scanr))
       break;
     char *out = second_idx.get_scan_key(scanr);
-    printf("[%d] %s\n", i++, out);
+    // printf("[%d] %s\n", i++, out);
     if (out)
       free(out);
   }

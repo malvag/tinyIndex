@@ -1,12 +1,9 @@
 
-# tinyIndex library
+# tinyLog library
 
 ### At the time of turnin:
 
-Not implemented/completed (due to limited time):
-    - multi-threaded driver
-    - not succesfull run of YCSB, but the YCSB-driver was partially implemented
-    - a small bug in the recovery, where i allocate more blobs for the index, the data and the index though are intact 
+Fixed every bug from previous submissions
 
 You can compile the library with my test using:
 ```bash
@@ -15,9 +12,9 @@ make
 mkdir <data_directory>
 
 # The default test will
-#   - create 1000 kv pairs
-#   - read 1000 of them
-#   - and iterate with scan 1000 of them
+#   - create 10000 kv pairs
+#   - read 10000 of them
+#   - and iterate with scan all of them
 ./test <data_directory>
 
 

@@ -2,9 +2,9 @@
 
 #include "tiny_index.h"
 class tiny_index;
-class log_handle_t {
+class log_handle {
    public:
-    log_handle_t(char *location);
+    log_handle(char *location);
 
     void append(struct tiny_kv_pair *pair);  // Appends key, value in the log
 
@@ -13,11 +13,9 @@ class log_handle_t {
     int log_read();                   // debug function only
     int replay(tiny_index *index);
 
-    int replay();  // recover actions from log
-
     pthread_rwlock_t* get_lock();
-    ~log_handle_t();
-    log_handle_t(char *location, tiny_index *index);
+    ~log_handle();
+    log_handle(char *location, tiny_index *index);
 
    private:
     int init_rwlock();
@@ -28,9 +26,10 @@ class log_handle_t {
     void allocate_new_log_read_buffer();
 
     pthread_t gc_thread_id_;
+    pthread_attr_t attr;
     pthread_rwlock_t *lock_;
     pthread_rwlockattr_t *lock_attr_;
-    log_handle_t();
+    log_handle();
     int fd_;
 
     off_t write_log_offset_;

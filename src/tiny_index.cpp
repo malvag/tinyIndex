@@ -11,7 +11,7 @@
 #include "tiny_log.h"
 
 extern struct tiny_blob_handle_t *tb_handle;
-log_handle_t *tiny_index::get_log_handle() { return log_handle_; }
+log_handle *tiny_index::get_log_handle() { return log_handle_; }
 int tiny_index::get_index_status_done_() { return index_status_done_; }
 
 int tiny_index::put(char *key, char *value) {
@@ -156,8 +156,8 @@ void tiny_index::recover(char *location) {
     handle_ = tb_handle;
     recover_unordered_map();
 #ifdef USE_LOG
-    log_handle_ = new log_handle_t(location, this);
-    log_handle_->replay();
+    log_handle_ = new log_handle(location, this);
+    log_handle_->replay(this);
 #endif
     printf("allocator blob_meta size %d\n", handle_->bidno);
 }

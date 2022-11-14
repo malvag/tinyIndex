@@ -28,19 +28,19 @@ struct lookup_index {
     bid_t next_blob_id;
     uint32_t map_size;
 } __attribute__((__packed__));
-class log_handle_t;
+class log_handle;
 class scanner_handle_t;
 // typedef struct blob blob_t;
 class tiny_index {
    private:
     void recover_unordered_map();
     tiny_blob_handle_t *handle_ = nullptr;
-    log_handle_t *log_handle_ = nullptr;
+    log_handle *log_handle_ = nullptr;
     int index_status_done_;
 
    public:
 
-    log_handle_t *get_log_handle();
+    log_handle *get_log_handle();
     int get_index_status_done_();
     void set_index_status_done_(int f);
 
