@@ -195,7 +195,7 @@ void tiny_index::recover_unordered_map() {
                         "size: %lu\n",
                         pair.blob_id, pair.blob_offset, pair.tiny_kv_pair_size);
             }
-            printf("Recovered %d indices from blob %u\n", i, current_block);
+            // printf("Recovered %d indices from blob %u\n", i, current_block);
             i = 0;
             for (; i < lindex->map_size; i++) {
                 lookup_index_node lnode = lindex->map_data[i];
@@ -238,11 +238,11 @@ void tiny_index::recover_unordered_map() {
                 kv_pair = NULL;
             }
 
-            printf("Recovered %d kvpairs from blob %u\n", i, current_block);
             current_block = lindex->next_blob_id;
             first_block = 0;
             free(lindex);
         }
+        printf("Recovered kvpairs\n");
         //  build unordered map with data from this blob
         //  if end of blob: continue to the next blob(if exists) and repeat
 
@@ -256,11 +256,11 @@ void tiny_index::persist_unordered_map() {
     lookup_index *lindex =
         (lookup_index *)memalign(FS_LOGICAL_BLK_SIZE, FILE_BLOB_SIZE);
     lindex->next_blob_id = 0;
-    for (int i = 0; i < tb_handle->bidno; i++) {
-        printf("Blob_%u owned by %u and free space left %u\n",
-               tb_handle->table[i]->id, tb_handle->table[i]->owner,
-               tb_handle->table[i]->size_used);
-    }
+    // for (int i = 0; i < tb_handle->bidno; i++) {
+    //     printf("Blob_%u owned by %u and free space left %u\n",
+    //            tb_handle->table[i]->id, tb_handle->table[i]->owner,
+    //            tb_handle->table[i]->size_used);
+    // }
 
     int i = 0;
 

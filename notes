@@ -1,0 +1,5 @@
+sudo mount /dev/sdb1 /mnt/ssd 
+cd /mnt/ssd
+./clean_data.sh
+
+LC_TIME=en_US.UTF-8 ./bin/ycsb-tinyindex -e execution_plan.txt -o /mnt/ssd/tinystore_without_log

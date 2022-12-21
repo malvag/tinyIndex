@@ -172,8 +172,8 @@ tiny_kv_pair *log_handle::try_read_from_log_buffer() {
            kv_pair->value_size);
     uint32_t true_kvsize = sizeof(kv_pair->key_size) + kv_pair->key_size +
                            sizeof(kv_pair->value_size) + kv_pair->value_size;
-    printf("Read buffer offset %ld and got key %s\n", read_buffer_offset_,
-           kv_pair->key);
+    // printf("Read buffer offset %ld and got key %s\n", read_buffer_offset_,
+    //        kv_pair->key);
 
     read_buffer_offset_ += true_kvsize;
     return kv_pair;
@@ -193,7 +193,7 @@ int log_handle::truncate(tiny_index *index) {
     char *write_shifted_buffer =
         (char *)memalign(FS_LOGICAL_BLK_SIZE, LOG_FILE_SIZE);
     memset(write_shifted_buffer, 0, LOG_FILE_SIZE);
-    uint32_t write_shifted_buffer_size = LOG_FILE_SIZE;
+    uint64_t write_shifted_buffer_size = LOG_FILE_SIZE;
     off_t write_shifted_buffer_offset = 0;
     if (ret == -1) {
         perror("Could not read file");
@@ -224,7 +224,8 @@ int log_handle::truncate(tiny_index *index) {
     }
     ret = pwrite(fd_, write_shifted_buffer, write_shifted_buffer_size, 0);
     if (ret != write_shifted_buffer_size) {
-        perror("SKATOULES");
+        perror("Written bytes are different than supossed to...");
+        printf("log:pwrite returned %lu\n",ret);
         free(write_shifted_buffer);
         return -1;
     }
